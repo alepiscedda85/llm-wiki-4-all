@@ -1,37 +1,128 @@
 # llm-wiki-4-all
 
-Template locale e generico per trasformare fonti grezze in una wiki Markdown persistente, interrogabile e manutenibile.
+`llm-wiki-4-all` e un framework locale, generico e file-based per costruire una wiki Markdown assistita da LLM su qualunque dominio.
 
-La repo parte vuota e neutrale: chi la scarica puo usarla per studio, lavoro, ricerca, clienti, procedure interne, documentazione tecnica, knowledge base personale o qualunque altro dominio.
+L'idea e semplice: metti fonti grezze in `raw/sources/`, la CLI le trasforma in pagine strutturate dentro `wiki/`, poi puoi interrogare la wiki, salvare output riutilizzabili e lanciare un audit operativo con `lint`.
 
-Di default usa modelli gratuiti/locali tramite Ollama, con default `qwen2.5:3b`. In alternativa puoi inserire la tua chiave OpenAI nel file `.env` e usare il provider OpenAI. Non usa database, LangChain o frontend.
+La repo nasce neutra: non contiene un dominio obbligatorio. Puoi usarla per lavoro, studio, ricerca, clienti, procedure interne, documentazione tecnica, knowledge base personale, analisi di mercato, manuali operativi o archivi tematici.
 
-## Struttura
+Di default usa modelli gratuiti/locali tramite Ollama. Se vuoi, puoi usare anche OpenAI inserendo la tua API key nel file `.env`.
+
+Non usa database, vector database, LangChain o frontend.
+
+## A cosa serve
+
+Serve a trasformare materiale sparso in conoscenza operativa persistente.
+
+Esempi di fonti:
+
+- appunti `.md` o `.txt`;
+- trascrizioni di call;
+- brief cliente;
+- procedure interne;
+- note di ricerca;
+- FAQ;
+- documentazione tecnica;
+- bozze di offerte;
+- checklist;
+- casi reali;
+- decisioni di progetto.
+
+Esempi di output:
+
+- sintesi operative;
+- checklist;
+- template;
+- FAQ;
+- audit;
+- pacchetti di lavoro;
+- procedure;
+- domande aperte;
+- rischi e contraddizioni;
+- pagine wiki collegate tra loro.
+
+## Come funziona
+
+Flusso base:
 
 ```text
+raw/sources/*.md|txt
+        |
+        | ingest
+        v
+wiki/outputs/*.md
+        |
+        | index + log
+        v
+wiki/index.md + wiki/log.md
+        |
+        | query / lint
+        v
+risposte operative o nuovi output salvati
+```
+
+Ruoli delle cartelle:
+
+- `raw/`: archivio delle fonti originali, da non modificare automaticamente.
+- `wiki/`: conoscenza elaborata e mantenibile.
+- `wiki/index.md`: catalogo delle pagine con wikilink Obsidian-style.
+- `wiki/log.md`: registro cronologico append-only.
+- `wiki/outputs/`: pagine generate, risposte salvate, report lint.
+- `wiki/entities/`: persone, aziende, strumenti, luoghi, oggetti o attori rilevanti.
+- `wiki/concepts/`: concetti riutilizzabili.
+- `wiki/contradictions/`: pagine dedicate a rischi, contraddizioni o fonti deboli.
+
+## Struttura progetto
+
+```text
+.env.example          configurazione di esempio
+.gitignore            file esclusi da git
+AGENTS.md             istruzioni per agenti e modelli
+README.md             guida pratica del progetto
+requirements.txt      dipendenze Python
 raw/sources/          fonti originali .md o .txt
-wiki/                 wiki generata
+scripts/llm_wiki.py   CLI principale
 wiki/index.md         indice principale
 wiki/log.md           registro append-only
-wiki/overview.md      introduzione
-wiki/entities/        persone, aziende, luoghi, strumenti, oggetti, attori rilevanti
+wiki/overview.md      introduzione alla wiki
+wiki/entities/        entita rilevanti
 wiki/concepts/        concetti riutilizzabili
-wiki/outputs/         output operativi, template, audit, checklist, lint report
-wiki/contradictions/  contraddizioni, rischi e fonti deboli
-scripts/llm_wiki.py   CLI principale
+wiki/outputs/         output generati e report
+wiki/contradictions/  rischi e contraddizioni
 ```
+
+## Requisiti
+
+- Python 3.11+
+- Ollama per uso locale gratuito
+- Connessione internet solo per scaricare dipendenze e modelli
+- OpenAI API key solo se vuoi usare il provider OpenAI
+
+Su macOS spesso il comando corretto e `python3`, non `python`. Negli esempi sotto uso `python3 -B` per evitare la creazione di `__pycache__` durante i test.
 
 ## Installazione
 
-Richiede Python 3.11+. Ollama serve per l'uso gratuito locale; OpenAI e opzionale.
+Crea un ambiente virtuale:
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
-### Uso gratuito con Ollama
+Inizializza la wiki:
+
+```bash
+python3 -B scripts/llm_wiki.py init
+```
+
+Output atteso:
+
+```text
+LLM Wiki inizializzata.
+```
+
+## Uso gratuito con Ollama
 
 Installa e avvia Ollama:
 
@@ -52,15 +143,7 @@ Fallback leggero:
 ollama pull llama3.2
 ```
 
-## Configurazione
-
-Puoi copiare `.env.example` in `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Configurazione default:
+Configurazione `.env` consigliata:
 
 ```env
 LLM_PROVIDER=ollama
@@ -68,9 +151,15 @@ OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:3b
 ```
 
-Non serve alcuna API key per usare l'MVP gratis: di default la CLI usa Ollama.
+## Uso opzionale con OpenAI
 
-Per usare OpenAI, aggiungi la tua chiave nel file `.env`:
+Copia la configurazione di esempio:
+
+```bash
+cp .env.example .env
+```
+
+Poi imposta:
 
 ```env
 LLM_PROVIDER=openai
@@ -78,129 +167,304 @@ OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-5.2
 ```
 
-Provider:
+Puoi anche usare il provider automatico:
 
-- `--provider ollama`: default, usa Ollama locale.
-- `--provider openai`: forza OpenAI e richiede `OPENAI_API_KEY`.
-- `--provider auto`: usa OpenAI se `OPENAI_API_KEY` e presente, altrimenti Ollama.
-
-## Comandi
-
-Inizializza struttura e file base:
-
-```bash
-python scripts/llm_wiki.py init
+```env
+LLM_PROVIDER=auto
 ```
 
-Output atteso:
+Con `auto`, la CLI usa OpenAI se trova `OPENAI_API_KEY`; altrimenti resta su Ollama.
+
+## Provider e modelli
+
+Default:
 
 ```text
-LLM Wiki inizializzata.
+provider: ollama
+model: qwen2.5:3b
 ```
 
-Ingerisci una fonte con path esplicito:
+Override globale:
 
 ```bash
-python scripts/llm_wiki.py ingest raw/sources/appunti-progetto.md
+python3 -B scripts/llm_wiki.py --provider ollama --model llama3.2 query "Riassumi la wiki"
 ```
 
-Oppure usa il nome file: la CLI cerchera anche in `raw/sources/`.
+Override sul singolo comando:
 
 ```bash
-python scripts/llm_wiki.py ingest appunti-progetto.md
+python3 -B scripts/llm_wiki.py query "Riassumi la wiki" --model llama3.2
 ```
 
-Usa un modello diverso:
+OpenAI:
 
 ```bash
-python scripts/llm_wiki.py ingest appunti-progetto.md --model llama3.2
+python3 -B scripts/llm_wiki.py query "Riassumi la wiki" --provider openai --model gpt-5.2
 ```
 
-Forza Ollama:
+## Comandi principali
+
+### init
+
+Crea cartelle e file base in modo idempotente:
 
 ```bash
-python scripts/llm_wiki.py ingest appunti-progetto.md --provider ollama
+python3 -B scripts/llm_wiki.py init
 ```
 
-Usa OpenAI con la tua chiave:
+### ingest
+
+Legge una fonte `.md` o `.txt`, la manda al modello e salva una pagina strutturata in `wiki/outputs/`:
 
 ```bash
-python scripts/llm_wiki.py ingest appunti-progetto.md --provider openai --model gpt-5.2
+python3 -B scripts/llm_wiki.py ingest raw/sources/appunti-progetto.md
 ```
 
-Interroga la wiki:
+Puoi indicare solo il nome file: la CLI cerca prima il path dato e poi `raw/sources/`.
 
 ```bash
-python scripts/llm_wiki.py query "Riassumi le decisioni operative emerse finora"
+python3 -B scripts/llm_wiki.py ingest appunti-progetto.md
 ```
 
-Salva la risposta:
+`ingest` aggiorna anche:
+
+- `wiki/index.md`;
+- `wiki/log.md`.
+
+### query
+
+Cerca nella wiki con scoring lessicale semplice, costruisce un contesto e chiede al modello una risposta operativa:
 
 ```bash
-python scripts/llm_wiki.py query "Crea una checklist operativa dai documenti disponibili" --save
+python3 -B scripts/llm_wiki.py query "Riassumi la conoscenza disponibile nella wiki"
 ```
 
-Analizza qualita, rischi e opportunita:
+La risposta deve citare i file wiki usati.
+
+### query --save
+
+Salva la risposta in `wiki/outputs/` e aggiorna indice/log:
 
 ```bash
-python scripts/llm_wiki.py lint
+python3 -B scripts/llm_wiki.py query "Crea un output operativo basato sulla wiki" --save
 ```
 
-Il report lint viene salvato in `wiki/outputs/lint-YYYY-MM-DD.md`.
+### lint
 
-## Esempio fonte generica
+Analizza la wiki e salva un report operativo in `wiki/outputs/`:
 
-Crea `raw/sources/appunti-progetto.md`:
+```bash
+python3 -B scripts/llm_wiki.py lint
+```
+
+Il report copre:
+
+- contraddizioni;
+- pagine troppo generiche;
+- pagine orfane;
+- concetti citati ma non sviluppati;
+- output mancanti;
+- opportunita operative;
+- rischi di allucinazione;
+- fonti deboli;
+- possibili pagine da creare;
+- aree migliorabili.
+
+## Primo test end-to-end
+
+Crea `raw/sources/example.md`:
 
 ```md
-# Appunti progetto
+# Example Knowledge Source
 
-Obiettivo: raccogliere fonti, decisioni e procedure in una wiki locale.
+Obiettivo: verificare che la wiki locale trasformi fonti grezze in conoscenza Markdown riutilizzabile.
 
-Problema: le informazioni sono sparse tra note, documenti e messaggi.
+Contesto: questo file e una fonte neutra di collaudo. Non appartiene a un dominio specifico.
 
-Vincoli: mantenere le fonti originali immutabili, citare i file usati e segnalare informazioni mancanti.
+Punti operativi:
+- mantenere le fonti originali in raw/sources/;
+- generare pagine strutturate in wiki/outputs/;
+- aggiornare index e log;
+- interrogare la wiki citando i file usati;
+- segnalare informazioni mancanti o deboli.
 
-Output utili: checklist, FAQ, sintesi operative, template e domande aperte.
+Output attesi: sintesi, checklist, domande aperte e note di manutenzione.
 ```
 
-Poi esegui:
+Esegui:
 
 ```bash
-python scripts/llm_wiki.py ingest appunti-progetto.md
+python3 -B scripts/llm_wiki.py init
+python3 -B scripts/llm_wiki.py ingest raw/sources/example.md
+python3 -B scripts/llm_wiki.py query "Riassumi la conoscenza disponibile nella wiki"
+python3 -B scripts/llm_wiki.py query "Crea un output operativo basato sulla wiki" --save
+python3 -B scripts/llm_wiki.py lint
 ```
 
-## Esempio output atteso
+## Formato delle pagine generate
 
-La CLI generera una pagina in `wiki/outputs/` con:
+Ogni pagina wiki generata deve avere frontmatter YAML:
 
-- sintesi operativa
-- punti chiave
-- implicazioni pratiche
-- output riutilizzabili
-- collegamenti wiki
-- contraddizioni o rischi
-- domande aperte
-- fonti
-- note di manutenzione
+```md
+---
+title:
+type:
+source:
+created:
+updated:
+tags:
+status: draft
+---
+```
 
-`wiki/index.md` ricevera un wikilink Obsidian-style con categoria, descrizione e data ultimo aggiornamento. `wiki/log.md` registrera l'operazione in append.
+E queste sezioni:
+
+```md
+# Titolo
+
+## Sintesi operativa
+
+## Punti chiave
+
+## Implicazioni pratiche
+
+## Output riutilizzabili
+
+## Collegamenti
+
+## Contraddizioni o rischi
+
+## Domande aperte
+
+## Fonti
+
+## Note di manutenzione
+```
+
+## Come usare bene la wiki
+
+Buone fonti producono buoni output. Conviene inserire materiale concreto:
+
+- decisioni gia prese;
+- vincoli reali;
+- esempi riusciti;
+- procedure esistenti;
+- criteri di qualita;
+- problemi ricorrenti;
+- domande frequenti;
+- template da riusare.
+
+Evita di ingerire materiale troppo generico, duplicato o non verificabile. Se una fonte e debole, meglio che la wiki lo segnali invece di trasformarla in falsa certezza.
+
+## Manutenzione consigliata
+
+Routine semplice:
+
+1. Aggiungi fonti in `raw/sources/`.
+2. Esegui `ingest` sulle fonti nuove.
+3. Leggi le pagine generate in `wiki/outputs/`.
+4. Correggi o consolida manualmente le pagine importanti.
+5. Usa `query --save` per creare output riutilizzabili.
+6. Esegui `lint` periodicamente.
+7. Sposta o riscrivi a mano le pagine mature in `wiki/entities/`, `wiki/concepts/` o altre sezioni.
+
+## Cosa committare
+
+Per una repo template pubblica conviene committare:
+
+- codice;
+- README;
+- AGENTS;
+- `.env.example`;
+- struttura base della wiki;
+- eventuali esempi piccoli e neutri, se utili.
+
+Conviene evitare di committare:
+
+- `.env`;
+- chiavi API;
+- fonti private;
+- output generati da test locali;
+- materiale cliente o dati sensibili.
+
+## Troubleshooting
+
+### `python: command not found`
+
+Usa `python3`:
+
+```bash
+python3 -B scripts/llm_wiki.py init
+```
+
+### Ollama non risponde
+
+Avvia Ollama:
+
+```bash
+ollama serve
+```
+
+Controlla l'host:
+
+```bash
+curl http://localhost:11434/api/tags
+```
+
+### Modello non trovato
+
+Scaricalo:
+
+```bash
+ollama pull qwen2.5:3b
+```
+
+### OpenAI non funziona
+
+Verifica `.env`:
+
+```env
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-5.2
+```
+
+Poi reinstalla le dipendenze se serve:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+### Output del modello troppo generico
+
+Migliora la fonte. Aggiungi:
+
+- contesto;
+- esempi;
+- vincoli;
+- obiettivi;
+- criteri decisionali;
+- dati verificabili;
+- output attesi.
 
 ## Limiti MVP
 
-- Ricerca locale lessicale, non embedding.
-- Provider LLM attivi: Ollama locale oppure OpenAI via API key personale.
+- Ricerca locale lessicale, non semantica.
+- Nessun embedding.
 - Nessun database.
 - Nessun frontend.
 - Nessun export PDF.
-- La qualita dipende dal modello scelto e dalla chiarezza delle fonti.
-- I modelli piccoli possono sbagliare: usare `lint` e mantenere fonti verificabili.
+- Nessuna gestione multiutente.
+- La qualita dipende dal modello scelto e dalla qualita delle fonti.
+- I modelli piccoli possono mischiare lingue o produrre risposte imperfette: usare `lint` e revisionare gli output importanti.
 
-## Prossimi step
+## Prossimi step possibili
 
-- Frontend guidato per consultazione e manutenzione.
+- Prompt piu rigidi per lingua e formato.
+- Test automatici CLI.
+- Profili di progetto separati.
+- Template pagina personalizzabili.
 - Export PDF.
+- Frontend guidato.
 - RAG ibrido con embedding locali.
-- Profili multi-progetto.
-- Template personalizzabili per domini diversi.
-- Selezione provider piu avanzata con profili per progetto/team.
+- Supporto multi-wiki o multi-dominio.

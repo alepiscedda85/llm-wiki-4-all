@@ -403,13 +403,23 @@ def extract_title(markdown: str, fallback: str) -> str:
     return fallback
 
 
+def strip_markdown_fence(markdown: str) -> str:
+    """Rimuove eventuali code fence quando il modello incapsula l'intera pagina."""
+    stripped = markdown.strip()
+    lines = stripped.splitlines()
+    if len(lines) >= 2 and lines[0].strip().startswith("```") and lines[-1].strip() == "```":
+        return "\n".join(lines[1:-1]).strip()
+    return stripped
+
+
 def normalize_generated_page(markdown: str, source: str, fallback_title: str) -> tuple[str, str]:
     """Garantisce che ogni output salvato abbia almeno una pagina Markdown valida."""
+    markdown = strip_markdown_fence(markdown)
     title = extract_title(markdown, fallback_title)
     if markdown.startswith("---"):
         return markdown.rstrip() + "\n", title
-    return empty_page(title, "output", source, ["llm-wiki"]) + "\n" + markdown.rstrip() + "\n"
-
+    page = empty_page(title, "output", source, ["llm-wiki"]) + "\n" + markdown.rstrip() + "\n"
+    return page, title
 
 def resolve_source_path(source: str) -> Path:
     """Cerca prima il path indicato e poi raw/sources/, senza modificare raw/."""
