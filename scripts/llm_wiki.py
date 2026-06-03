@@ -6,9 +6,16 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from llm_wiki.workspace import Workspace
 
 try:
     import requests
@@ -27,20 +34,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - OpenAI is optional unless selected.
     OpenAI = None
 
-
-# Tutti i path sono calcolati dalla posizione dello script, cosi la CLI puo
-# essere lanciata dalla root del progetto senza configurazione aggiuntiva.
-ROOT = Path(__file__).resolve().parents[1]
-RAW_DIR = ROOT / "raw"
-SOURCES_DIR = RAW_DIR / "sources"
-WIKI_DIR = ROOT / "wiki"
-OUTPUTS_DIR = WIKI_DIR / "outputs"
-CONTRADICTIONS_DIR = WIKI_DIR / "contradictions"
-INDEX_FILE = WIKI_DIR / "index.md"
-LOG_FILE = WIKI_DIR / "log.md"
-OVERVIEW_FILE = WIKI_DIR / "overview.md"
-AGENTS_FILE = ROOT / "AGENTS.md"
-
+PROJECT_AGENTS_FILE = PROJECT_ROOT / "AGENTS.md"
 DEFAULT_PROVIDER = "ollama"
 DEFAULT_OLLAMA_MODEL = "qwen2.5:3b"
 DEFAULT_OPENAI_MODEL = "gpt-5.2"
@@ -48,7 +42,6 @@ DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 SUPPORTED_EXTENSIONS = {".md", ".txt"}
 MAX_SOURCE_CHARS = 45_000
 MAX_CONTEXT_CHARS = 30_000
-
 
 # Schema standard delle pagine generate. Mantenerlo stabile rende la wiki facile
 # da leggere in Obsidian, GitHub o qualunque editor Markdown.
@@ -63,6 +56,28 @@ PAGE_SECTIONS = [
     "Fonti",
     "Note di manutenzione",
 ]
+
+WORKSPACE_AGENTS_TEMPLATE = """# AGENTS.md - Workspace llm-wiki-4-all
+
+Sei il manutentore operativo di questa LLM Wiki locale.
+
+Regole:
+
+- Non inventare informazioni.
+- Usa solo fonti presenti in questo workspace o esplicitamente indicate dall'utente.
+- Non modificare mai `raw/`.
+- Inserisci nella wiki solo conoscenza operativa, verificabile e riutilizzabile.
+- Usa wikilink Obsidian-style quando colleghi pagine.
+- Segnala contraddizioni, rischi e fonti deboli.
+- Se un dato manca, scrivi che manca.
+"""
+
+CONFIG_TEMPLATE = """# Configurazione workspace llm-wiki-4-all
+name: workspace
+language: it
+provider: ollama
+model: qwen2.5:3b
+"""
 
 
 def now_iso() -> str:
@@ -106,27 +121,37 @@ def write_if_missing(path: Path, content: str) -> bool:
     return True
 
 
-def append_log(action: str, detail: str) -> None:
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with LOG_FILE.open("a", encoding="utf-8") as handle:
+def resolve_workspace(args: argparse.Namespace) -> Workspace:
+    """Resolve the selected workspace. Without --workspace, use the current directory."""
+    value = getattr(args, "workspace", None) or getattr(args, "global_workspace", None)
+    root = Path(value).expanduser() if value else Path.cwd()
+    if not root.is_absolute():
+        root = Path.cwd() / root
+    return Workspace(root.resolve())
+
+
+def append_log(workspace: Workspace, action: str, detail: str) -> None:
+    workspace.log_file.parent.mkdir(parents=True, exist_ok=True)
+    with workspace.log_file.open("a", encoding="utf-8") as handle:
         handle.write(f"- {now_iso()} | {action} | {detail}\n")
 
 
-def wiki_link(path: Path) -> str:
-    relative = path.relative_to(WIKI_DIR).with_suffix("")
+def wiki_link(workspace: Workspace, path: Path) -> str:
+    relative = path.relative_to(workspace.wiki_dir).with_suffix("")
     return f"[[{relative.as_posix()}]]"
 
 
 def update_index(
+    workspace: Workspace,
     title: str,
     path: Path,
     page_type: str,
     source: str = "",
     description: str = "",
 ) -> None:
-    """Aggiunge una pagina all'indice senza duplicare wikilink gia presenti."""
-    ensure_initialized()
-    link = wiki_link(path)
+    """Aggiunge una pagina all'indice del workspace senza duplicare wikilink."""
+    ensure_initialized(workspace)
+    link = wiki_link(workspace, path)
     updated = today_iso()
     clean_description = description or title
     entry = (
@@ -136,18 +161,23 @@ def update_index(
     if source:
         entry += f" - fonte: `{source}`"
 
-    current = read_text(INDEX_FILE)
+    current = read_text(workspace.index_file)
     if link in current:
         return
 
-    with INDEX_FILE.open("a", encoding="utf-8") as handle:
+    with workspace.index_file.open("a", encoding="utf-8") as handle:
         handle.write(f"{entry}\n")
 
 
-def ensure_initialized() -> None:
-    if not WIKI_DIR.exists() or not INDEX_FILE.exists() or not LOG_FILE.exists():
+def ensure_initialized(workspace: Workspace) -> None:
+    if (
+        not workspace.wiki_dir.exists()
+        or not workspace.index_file.exists()
+        or not workspace.log_file.exists()
+    ):
         raise SystemExit(
-            "Wiki non inizializzata. Esegui prima: python scripts/llm_wiki.py init"
+            "Wiki non inizializzata. Esegui prima: "
+            f"python scripts/llm_wiki.py init --workspace {workspace.root.as_posix()}"
         )
 
 
@@ -172,19 +202,13 @@ def empty_page(title: str, page_type: str, source: str, tags: list[str] | None =
     return f"{base_frontmatter(title, page_type, source, tags)}# {title}\n\n{sections}\n"
 
 
-def init_project(_: argparse.Namespace) -> None:
-    """Crea la struttura minima senza sovrascrivere contenuti esistenti."""
-    for directory in [
-        SOURCES_DIR,
-        WIKI_DIR / "entities",
-        WIKI_DIR / "concepts",
-        OUTPUTS_DIR,
-        CONTRADICTIONS_DIR,
-    ]:
-        directory.mkdir(parents=True, exist_ok=True)
+def init_project(args: argparse.Namespace) -> None:
+    """Crea la struttura minima del workspace senza sovrascrivere contenuti."""
+    workspace = resolve_workspace(args)
+    workspace.ensure_dirs()
 
     defaults = {
-        INDEX_FILE: (
+        workspace.index_file: (
             "# llm-wiki-4-all\n\n"
             "Indice operativo della knowledge base.\n\n"
             "## Pagine principali\n\n"
@@ -192,34 +216,34 @@ def init_project(_: argparse.Namespace) -> None:
             f"{today_iso()} - descrizione: introduzione alla wiki\n\n"
             "## Pagine generate\n\n"
         ),
-        LOG_FILE: "# Log manutenzione wiki\n\nRegistro cronologico append-only.\n\n",
-        OVERVIEW_FILE: empty_page(
-            "Overview",
-            "overview",
-            "init",
-            ["wiki"],
-        ),
+        workspace.log_file: "# Log manutenzione wiki\n\nRegistro cronologico append-only.\n\n",
+        workspace.overview_file: empty_page("Overview", "overview", "init", ["wiki"]),
+        workspace.agents_file: WORKSPACE_AGENTS_TEMPLATE,
+        workspace.config_file: CONFIG_TEMPLATE,
     }
 
     for path, content in defaults.items():
         write_if_missing(path, content)
 
-    append_log("init", "struttura verificata")
-    print("LLM Wiki inizializzata.")
+    append_log(workspace, "init", "struttura verificata")
+    print(f"LLM Wiki inizializzata in: {workspace.root.as_posix()}")
 
 
-def load_environment() -> None:
-    if load_dotenv:
-        load_dotenv(ROOT / ".env")
+def load_environment(workspace: Workspace | None = None) -> None:
+    if not load_dotenv:
+        return
+    load_dotenv(PROJECT_ROOT / ".env")
+    if workspace:
+        load_dotenv(workspace.root / ".env", override=True)
 
 
-def ollama_host() -> str:
-    load_environment()
+def ollama_host(workspace: Workspace | None = None) -> str:
+    load_environment(workspace)
     return os.getenv("OLLAMA_HOST", DEFAULT_OLLAMA_HOST).rstrip("/")
 
 
-def selected_provider(args: argparse.Namespace) -> str:
-    load_environment()
+def selected_provider(args: argparse.Namespace, workspace: Workspace | None = None) -> str:
+    load_environment(workspace)
     provider = args.provider or args.global_provider or os.getenv("LLM_PROVIDER", DEFAULT_PROVIDER)
     if provider != "auto":
         return provider
@@ -228,27 +252,37 @@ def selected_provider(args: argparse.Namespace) -> str:
     return "openai" if os.getenv("OPENAI_API_KEY") else "ollama"
 
 
-def selected_model(args: argparse.Namespace) -> str:
+def selected_model(args: argparse.Namespace, workspace: Workspace | None = None) -> str:
     if args.model:
         return args.model
     if args.global_model:
         return args.global_model
-    provider = selected_provider(args)
+    provider = selected_provider(args, workspace)
     if provider == "openai":
         return os.getenv("OPENAI_MODEL", DEFAULT_OPENAI_MODEL)
     return os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
 
 
-def call_llm(prompt: str, args: argparse.Namespace, system: str | None = None) -> str:
+def call_llm(
+    prompt: str,
+    args: argparse.Namespace,
+    system: str | None = None,
+    workspace: Workspace | None = None,
+) -> str:
     """Instrada la richiesta verso il provider scelto mantenendo invariati i prompt."""
-    provider = selected_provider(args)
-    model = selected_model(args)
+    provider = selected_provider(args, workspace)
+    model = selected_model(args, workspace)
     if provider == "openai":
-        return call_openai(prompt, model, system)
-    return call_ollama(prompt, model, system)
+        return call_openai(prompt, model, system, workspace)
+    return call_ollama(prompt, model, system, workspace)
 
 
-def call_ollama(prompt: str, model: str, system: str | None = None) -> str:
+def call_ollama(
+    prompt: str,
+    model: str,
+    system: str | None = None,
+    workspace: Workspace | None = None,
+) -> str:
     if requests is None:
         raise SystemExit(
             "Dipendenza mancante: requests. Installa con `pip install -r requirements.txt`."
@@ -267,7 +301,7 @@ def call_ollama(prompt: str, model: str, system: str | None = None) -> str:
     if system:
         payload["system"] = system
 
-    url = f"{ollama_host()}/api/generate"
+    url = f"{ollama_host(workspace)}/api/generate"
     try:
         response = requests.post(url, json=payload, timeout=300)
     except requests.ConnectionError as exc:
@@ -292,8 +326,13 @@ def call_ollama(prompt: str, model: str, system: str | None = None) -> str:
     return text
 
 
-def call_openai(prompt: str, model: str, system: str | None = None) -> str:
-    load_environment()
+def call_openai(
+    prompt: str,
+    model: str,
+    system: str | None = None,
+    workspace: Workspace | None = None,
+) -> str:
+    load_environment(workspace)
     if not os.getenv("OPENAI_API_KEY"):
         raise SystemExit(
             "Manca OPENAI_API_KEY. Crea un file .env o esporta la variabile."
@@ -321,7 +360,7 @@ def call_openai(prompt: str, model: str, system: str | None = None) -> str:
     return text
 
 
-def maintainer_system_prompt() -> str:
+def read_agents(workspace: Workspace) -> str:
     fallback = (
         "Sei il manutentore operativo di llm-wiki-4-all, una LLM Wiki Markdown locale. "
         "Non sei un chatbot generico. Non inventare informazioni. Se un dato manca, "
@@ -329,8 +368,10 @@ def maintainer_system_prompt() -> str:
         "operativi, casi reali e output riutilizzabili. Evita teoria generica e claim vaghi. "
         "Usa wikilink Obsidian-style quando proponi collegamenti."
     )
-    if AGENTS_FILE.exists():
-        return read_text(AGENTS_FILE)
+    if workspace.agents_file.exists():
+        return read_text(workspace.agents_file)
+    if PROJECT_AGENTS_FILE.exists():
+        return read_text(PROJECT_AGENTS_FILE)
     return fallback
 
 
@@ -421,59 +462,42 @@ def normalize_generated_page(markdown: str, source: str, fallback_title: str) ->
     page = empty_page(title, "output", source, ["llm-wiki"]) + "\n" + markdown.rstrip() + "\n"
     return page, title
 
-def resolve_source_path(source: str) -> Path:
-    """Cerca prima il path indicato e poi raw/sources/, senza modificare raw/."""
-    requested = Path(source)
-    candidates = []
-    if requested.is_absolute():
-        candidates.append(requested)
-    else:
-        candidates.append((ROOT / requested).resolve())
-        candidates.append((SOURCES_DIR / requested).resolve())
-
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-
-    tried = "\n".join(f"- {candidate}" for candidate in candidates)
-    raise SystemExit(f"File sorgente non trovato. Path provati:\n{tried}")
-
 
 def command_ingest(args: argparse.Namespace) -> None:
-    ensure_initialized()
-    source_path = resolve_source_path(args.source)
+    workspace = resolve_workspace(args)
+    ensure_initialized(workspace)
+    source_path = workspace.resolve_source(args.source)
 
     if source_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
         raise SystemExit("Formato non supportato. Usa file .md o .txt.")
-    try:
-        source_path.relative_to(RAW_DIR)
-    except ValueError:
-        pass
 
     source_text = read_text(source_path)
     if not source_text.strip():
         raise SystemExit("La fonte e vuota.")
 
     fallback_title = source_path.stem.replace("-", " ").replace("_", " ").title()
-    index_text = read_text(INDEX_FILE)
+    index_text = read_text(workspace.index_file)
     generated = call_llm(
         source_prompt(source_path, source_text, index_text),
         args,
-        maintainer_system_prompt(),
+        read_agents(workspace),
+        workspace,
     )
-    page, title = normalize_generated_page(generated, source_path.as_posix(), fallback_title)
-    target = unique_path(OUTPUTS_DIR / f"{slugify(title)}.md")
+    source_ref = workspace.display_path(source_path)
+    page, title = normalize_generated_page(generated, source_ref, fallback_title)
+    target = unique_path(workspace.outputs_dir / f"{slugify(title)}.md")
     target.write_text(page, encoding="utf-8")
 
     update_index(
+        workspace,
         title,
         target,
         "output",
-        source_path.as_posix(),
+        source_ref,
         "pagina generata da fonte grezza",
     )
-    append_log("ingest", f"{source_path.as_posix()} -> {target.relative_to(ROOT).as_posix()}")
-    print(f"Pagina creata: {target.relative_to(ROOT).as_posix()}")
+    append_log(workspace, "ingest", f"{source_ref} -> {workspace.display_path(target)}")
+    print(f"Pagina creata: {workspace.display_path(target)}")
 
 
 def unique_path(path: Path) -> Path:
@@ -492,10 +516,10 @@ def tokenize(text: str) -> list[str]:
     return re.findall(r"[a-z0-9àèéìòù]+", text.lower())
 
 
-def wiki_markdown_files() -> list[Path]:
-    if not WIKI_DIR.exists():
+def wiki_markdown_files(workspace: Workspace) -> list[Path]:
+    if not workspace.wiki_dir.exists():
         return []
-    return sorted(path for path in WIKI_DIR.rglob("*.md") if path.is_file())
+    return sorted(path for path in workspace.wiki_dir.rglob("*.md") if path.is_file())
 
 
 def score_file(query_terms: Counter[str], path: Path) -> tuple[int, Path, str]:
@@ -505,19 +529,19 @@ def score_file(query_terms: Counter[str], path: Path) -> tuple[int, Path, str]:
     return score, path, text
 
 
-def relevant_context(question: str, limit: int = 6) -> tuple[str, list[str]]:
+def relevant_context(workspace: Workspace, question: str, limit: int = 6) -> tuple[str, list[str]]:
     """Seleziona pagine rilevanti con scoring lessicale semplice, senza database."""
     query_terms = Counter(tokenize(question))
     if not query_terms:
         return "", []
 
-    scored = [score_file(query_terms, path) for path in wiki_markdown_files()]
+    scored = [score_file(query_terms, path) for path in wiki_markdown_files(workspace)]
     selected = [item for item in sorted(scored, key=lambda item: item[0], reverse=True) if item[0] > 0]
     chunks = []
     files = []
     used = 0
     for _, path, text in selected[:limit]:
-        relative = path.relative_to(WIKI_DIR).as_posix()
+        relative = path.relative_to(workspace.wiki_dir).as_posix()
         excerpt = text[:6000]
         chunk = f"\n\n---\nFILE: {relative}\n{excerpt}"
         if used + len(chunk) > MAX_CONTEXT_CHARS:
@@ -533,16 +557,21 @@ def query_prompt(
     context: str,
     context_files: list[str],
     index_text: str,
+    output_type: str,
 ) -> str:
     """Costruisce il prompt di risposta usando solo il contesto locale selezionato."""
     return f"""Rispondi alla domanda usando solo il contesto della wiki locale.
 
 Regole:
 - Se il contesto non basta, dillo chiaramente.
-- Produci una risposta operativa, vendibile e riutilizzabile.
+- Produci una risposta operativa e riutilizzabile.
+- Se e richiesto un tipo output, rispetta il tipo indicato.
 - Evidenzia assunzioni, rischi e prossime azioni.
 - Cita esplicitamente i file wiki usati nella sezione "File wiki usati".
 - Usa wikilink Obsidian-style quando citi pagine della wiki.
+
+Tipo output richiesto:
+{output_type}
 
 File wiki selezionati:
 {format_file_list(context_files)}
@@ -561,23 +590,27 @@ Contesto wiki:
 
 
 def command_query(args: argparse.Namespace) -> None:
-    ensure_initialized()
-    context, context_files = relevant_context(args.question)
-    index_text = read_text(INDEX_FILE)
+    workspace = resolve_workspace(args)
+    ensure_initialized(workspace)
+    output_type = args.output_type or "query-output"
+    context, context_files = relevant_context(workspace, args.question)
+    index_text = read_text(workspace.index_file)
     answer = call_llm(
-        query_prompt(args.question, context, context_files, index_text),
+        query_prompt(args.question, context, context_files, index_text, output_type),
         args,
-        maintainer_system_prompt(),
+        read_agents(workspace),
+        workspace,
     )
     print(answer)
 
     if args.save:
         title = f"Query - {args.question[:80]}"
-        target = unique_path(OUTPUTS_DIR / f"query-{now_stamp()}-{slugify(args.question)}.md")
+        target = unique_path(workspace.outputs_dir / f"query-{now_stamp()}-{slugify(args.question)}.md")
         page = (
-            base_frontmatter(title, "query-output", "query", ["query", "output"])
+            base_frontmatter(title, output_type, "query", ["query", "output", output_type])
             + f"# {title}\n\n"
             + f"## Domanda\n\n{args.question}\n\n"
+            + f"## Tipo output\n\n{output_type}\n\n"
             + "## Risposta operativa\n\n"
             + answer.rstrip()
             + "\n\n## File wiki usati\n\n"
@@ -587,9 +620,9 @@ def command_query(args: argparse.Namespace) -> None:
             + "\n"
         )
         target.write_text(page, encoding="utf-8")
-        update_index(title, target, "query-output", "query", "risposta salvata da query")
-        append_log("query-save", target.relative_to(ROOT).as_posix())
-        print(f"\nRisposta salvata: {target.relative_to(ROOT).as_posix()}")
+        update_index(workspace, title, target, output_type, "query", "risposta salvata da query")
+        append_log(workspace, "query-save", workspace.display_path(target))
+        print(f"\nRisposta salvata: {workspace.display_path(target)}")
 
 
 def lint_prompt(context: str) -> str:
@@ -621,12 +654,12 @@ Contesto wiki:
 """
 
 
-def full_wiki_context() -> str:
-    """Compatta la wiki in un contesto limitato per il comando lint."""
+def full_wiki_context(workspace: Workspace) -> str:
+    """Compatta la wiki del workspace in un contesto limitato per il comando lint."""
     chunks = []
     used = 0
-    for path in wiki_markdown_files():
-        relative = path.relative_to(WIKI_DIR).as_posix()
+    for path in wiki_markdown_files(workspace):
+        relative = path.relative_to(workspace.wiki_dir).as_posix()
         text = read_text(path)
         chunk = f"\n\n---\nFILE: {relative}\n{text[:5000]}"
         if used + len(chunk) > MAX_CONTEXT_CHARS:
@@ -637,26 +670,34 @@ def full_wiki_context() -> str:
 
 
 def command_lint(args: argparse.Namespace) -> None:
-    ensure_initialized()
+    workspace = resolve_workspace(args)
+    ensure_initialized(workspace)
     report = call_llm(
-        lint_prompt(full_wiki_context()),
+        lint_prompt(full_wiki_context(workspace)),
         args,
-        maintainer_system_prompt(),
+        read_agents(workspace),
+        workspace,
     )
     title = f"Lint report {today_iso()}"
-    target = unique_path(OUTPUTS_DIR / f"lint-{today_iso()}.md")
+    target = unique_path(workspace.outputs_dir / f"lint-{today_iso()}.md")
     page = base_frontmatter(title, "lint-report", "wiki", ["lint", "rischi"]) + report.rstrip() + "\n"
     target.write_text(page, encoding="utf-8")
-    update_index(title, target, "lint-report", "wiki", "report qualita wiki")
-    append_log("lint", target.relative_to(ROOT).as_posix())
+    update_index(workspace, title, target, "lint-report", "wiki", "report qualita wiki")
+    append_log(workspace, "lint", workspace.display_path(target))
     print(report)
-    print(f"\nReport salvato: {target.relative_to(ROOT).as_posix()}")
+    print(f"\nReport salvato: {workspace.display_path(target)}")
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Definisce l'interfaccia CLI pubblica."""
     parser = argparse.ArgumentParser(
         description="llm-wiki-4-all - CLI locale con Ollama o OpenAI"
+    )
+    parser.add_argument(
+        "--workspace",
+        dest="global_workspace",
+        default=None,
+        help="Path workspace. Default: directory corrente.",
     )
     parser.add_argument(
         "--provider",
@@ -677,6 +718,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    def add_workspace_argument(subparser: argparse.ArgumentParser) -> None:
+        subparser.add_argument(
+            "--workspace",
+            default=None,
+            help="Path workspace. Default: directory corrente.",
+        )
+
     def add_model_argument(subparser: argparse.ArgumentParser) -> None:
         subparser.add_argument(
             "--provider",
@@ -694,20 +742,30 @@ def build_parser() -> argparse.ArgumentParser:
         )
 
     init_parser = subparsers.add_parser("init", help="Crea struttura e file base")
+    add_workspace_argument(init_parser)
     init_parser.set_defaults(func=init_project)
 
     ingest_parser = subparsers.add_parser("ingest", help="Ingerisce una fonte .md o .txt")
-    ingest_parser.add_argument("source", help="Path fonte, es. raw/sources/offerta.md")
+    ingest_parser.add_argument("source", help="Path fonte, es. raw/sources/appunti.md")
+    add_workspace_argument(ingest_parser)
     add_model_argument(ingest_parser)
     ingest_parser.set_defaults(func=command_ingest)
 
     query_parser = subparsers.add_parser("query", help="Interroga la wiki locale")
     query_parser.add_argument("question", help="Domanda operativa")
     query_parser.add_argument("--save", action="store_true", help="Salva la risposta in wiki/outputs")
+    query_parser.add_argument(
+        "--type",
+        dest="output_type",
+        default="query-output",
+        help="Tipo output quando si salva o si richiede un formato specifico.",
+    )
+    add_workspace_argument(query_parser)
     add_model_argument(query_parser)
     query_parser.set_defaults(func=command_query)
 
     lint_parser = subparsers.add_parser("lint", help="Analizza la wiki e salva un report")
+    add_workspace_argument(lint_parser)
     add_model_argument(lint_parser)
     lint_parser.set_defaults(func=command_lint)
 

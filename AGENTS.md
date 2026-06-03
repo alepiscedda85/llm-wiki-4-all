@@ -77,6 +77,17 @@ OpenAI e opzionale:
 
 Il file `.env.example` puo documentare variabili, ma non deve contenere segreti.
 
+
+## Regole multi-workspace
+
+- Un workspace e la root operativa di una singola wiki.
+- Senza `--workspace`, la directory corrente e il workspace.
+- Con `--workspace`, leggere e scrivere solo dentro il workspace indicato.
+- Ogni workspace puo avere il proprio `AGENTS.md` e `config.yaml`.
+- Non mischiare fonti, output, indice o log tra workspace diversi.
+- `raw/`, `wiki/`, `index.md`, `log.md` e `outputs/` sono sempre relativi al workspace selezionato.
+- Le istruzioni agente vanno lette in ordine: `workspace/AGENTS.md`, `AGENTS.md` della root progetto, fallback interno minimale.
+
 ## Regole sui file
 
 ### raw/

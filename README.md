@@ -72,19 +72,123 @@ Ruoli delle cartelle:
 - `wiki/concepts/`: concetti riutilizzabili.
 - `wiki/contradictions/`: pagine dedicate a rischi, contraddizioni o fonti deboli.
 
+## Multi-workspace usage
+
+Un workspace e una cartella autonoma che contiene una LLM Wiki separata.
+
+Ogni workspace ha le proprie fonti, istruzioni, configurazione, indice, log e output:
+
+```text
+workspace/
+  AGENTS.md
+  config.yaml
+  raw/
+    sources/
+  wiki/
+    index.md
+    log.md
+    overview.md
+    entities/
+    concepts/
+    outputs/
+    contradictions/
+```
+
+Perche usarlo:
+
+- separare progetti diversi;
+- evitare che fonti e output si mischino;
+- usare istruzioni diverse per wiki diverse;
+- mantenere una repo unica con piu knowledge base locali;
+- testare casi diversi senza sporcare la wiki principale.
+
+Quando usare una singola wiki:
+
+- stai lavorando su un solo dominio;
+- vuoi una knowledge base personale semplice;
+- non hai bisogno di separare clienti, progetti o contesti.
+
+Quando usare piu workspace:
+
+- hai piu progetti;
+- vuoi una wiki per cliente;
+- vuoi separare lavoro, studio e ricerca;
+- vuoi mantenere istruzioni `AGENTS.md` diverse;
+- vuoi distribuire un template vuoto e lasciare che ogni persona crei la propria istanza.
+
+Senza `--workspace`, la CLI usa la directory corrente come workspace. Questo mantiene compatibile l'uso single-wiki:
+
+```bash
+python3 -B scripts/llm_wiki.py init
+python3 -B scripts/llm_wiki.py ingest raw/sources/example.md
+python3 -B scripts/llm_wiki.py query "Riassumi la wiki"
+python3 -B scripts/llm_wiki.py lint
+```
+
+Con `--workspace`, tutti i path operativi vengono risolti dentro quella cartella:
+
+```bash
+python3 -B scripts/llm_wiki.py init --workspace instances/example
+```
+
+Aggiungi una fonte in:
+
+```text
+instances/example/raw/sources/example.md
+```
+
+Poi puoi ingerirla indicando solo il nome file, perche la CLI cerca anche in `workspace/raw/sources/`:
+
+```bash
+python3 -B scripts/llm_wiki.py ingest example.md --workspace instances/example
+```
+
+Interroga solo quella wiki:
+
+```bash
+python3 -B scripts/llm_wiki.py query "Riassumi la wiki" --workspace instances/example
+```
+
+Salva un output operativo in quel workspace:
+
+```bash
+python3 -B scripts/llm_wiki.py query "Crea una checklist" --type checklist --workspace instances/example --save
+```
+
+Esegui lint solo su quel workspace:
+
+```bash
+python3 -B scripts/llm_wiki.py lint --workspace instances/example
+```
+
+Esempio di struttura multi-wiki:
+
+```text
+instances/
+  example/
+  personal-knowledge/
+  software-docs/
+  client-alpha/
+```
+
+Ogni istanza ha `AGENTS.md`, `config.yaml`, `raw/` e `wiki/` separati. Il motore resta unico: `scripts/llm_wiki.py` e il package `llm_wiki/`.
+
 ## Struttura progetto
 
 ```text
 .env.example          configurazione di esempio
 .gitignore            file esclusi da git
-AGENTS.md             istruzioni per agenti e modelli
+AGENTS.md             istruzioni fallback per agenti e modelli
 README.md             guida pratica del progetto
 requirements.txt      dipendenze Python
-raw/sources/          fonti originali .md o .txt
+llm_wiki/             package core, inclusa la logica Workspace
 scripts/llm_wiki.py   CLI principale
-wiki/index.md         indice principale
-wiki/log.md           registro append-only
-wiki/overview.md      introduzione alla wiki
+instances/            workspace opzionali, uno per wiki
+raw/sources/          fonti originali della wiki corrente
+config.yaml           configurazione della wiki corrente, se inizializzata
+wiki/index.md         indice principale della wiki corrente
+wiki/log.md           registro append-only della wiki corrente
+wiki/overview.md      introduzione della wiki corrente
 wiki/entities/        entita rilevanti
 wiki/concepts/        concetti riutilizzabili
 wiki/outputs/         output generati e report
@@ -119,7 +223,7 @@ python3 -B scripts/llm_wiki.py init
 Output atteso:
 
 ```text
-LLM Wiki inizializzata.
+LLM Wiki inizializzata in: /path/del/workspace
 ```
 
 ## Uso gratuito con Ollama
@@ -206,10 +310,16 @@ python3 -B scripts/llm_wiki.py query "Riassumi la wiki" --provider openai --mode
 
 ### init
 
-Crea cartelle e file base in modo idempotente:
+Crea cartelle e file base in modo idempotente nella directory corrente:
 
 ```bash
 python3 -B scripts/llm_wiki.py init
+```
+
+Oppure in un workspace dedicato:
+
+```bash
+python3 -B scripts/llm_wiki.py init --workspace instances/example
 ```
 
 ### ingest
@@ -247,6 +357,12 @@ Salva la risposta in `wiki/outputs/` e aggiorna indice/log:
 
 ```bash
 python3 -B scripts/llm_wiki.py query "Crea un output operativo basato sulla wiki" --save
+```
+
+Puoi indicare un tipo di output:
+
+```bash
+python3 -B scripts/llm_wiki.py query "Crea una checklist" --type checklist --save
 ```
 
 ### lint

@@ -1,0 +1,5 @@
+# Configurazione workspace llm-wiki-4-all
+name: workspace
+language: it
+provider: ollama
+model: qwen2.5:3b
