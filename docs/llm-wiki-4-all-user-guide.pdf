@@ -1,0 +1,492 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 1474 >>
+stream
+BT
+/F1 10 Tf
+50 790 Td
+14 TL
+(GUIDA PRATICA LLM-WIKI-4-ALL) Tj
+T* () Tj
+T* (Questa guida spiega come usare llm-wiki-4-all e come adattarlo a lavori, progetti e) Tj
+T* (domini diversi.) Tj
+T* () Tj
+T* (Il progetto e pensato per persone che vogliono trasformare fonti sparse in una wiki) Tj
+T* (Markdown locale, interrogabile e manutenibile.) Tj
+T* () Tj
+T* (1. IDEA BASE) Tj
+T* () Tj
+T* (llm-wiki-4-all funziona come una piccola officina di conoscenza:) Tj
+T* () Tj
+T* (fonti grezze -> ingest -> pagine wiki -> query -> output operativi -> lint) Tj
+T* () Tj
+T* (Le fonti restano in raw/sources/ e non vengono modificate. La conoscenza elaborata viene) Tj
+T* (salvata in wiki/.) Tj
+T* () Tj
+T* (2. INSTALLAZIONE RAPIDA) Tj
+T* () Tj
+T* (git clone https://github.com/alepiscedda85/llm-wiki-4-all.git) Tj
+T* (cd llm-wiki-4-all) Tj
+T* (python3 -m venv .venv) Tj
+T* (source .venv/bin/activate) Tj
+T* (python3 -m pip install -r requirements.txt) Tj
+T* () Tj
+T* (Installa Ollama e scarica il modello consigliato:) Tj
+T* () Tj
+T* (brew install ollama) Tj
+T* (ollama serve) Tj
+T* (ollama pull qwen2.5:3b) Tj
+T* () Tj
+T* (Inizializza una wiki:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py init) Tj
+T* () Tj
+T* (3. USO BASE SINGLE-WIKI) Tj
+T* () Tj
+T* (Crea una fonte:) Tj
+T* () Tj
+T* (raw/sources/appunti-progetto.md) Tj
+T* () Tj
+T* (Esempio:) Tj
+T* () Tj
+T* (# Appunti progetto) Tj
+T* () Tj
+T* (Obiettivo: raccogliere decisioni, procedure e domande aperte in una wiki locale.) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+4 0 obj
+<< /Length 1326 >>
+stream
+BT
+/F1 10 Tf
+50 790 Td
+14 TL
+() Tj
+T* (Vincoli:) Tj
+T* (- non modificare le fonti originali;) Tj
+T* (- salvare output riutilizzabili;) Tj
+T* (- citare sempre i file usati.) Tj
+T* () Tj
+T* (Output desiderati:) Tj
+T* (- checklist;) Tj
+T* (- FAQ;) Tj
+T* (- sintesi operative;) Tj
+T* (- piano prossime azioni.) Tj
+T* () Tj
+T* (Ingerisci la fonte:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py ingest raw/sources/appunti-progetto.md) Tj
+T* () Tj
+T* (Interroga la wiki:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py query "Riassumi le decisioni operative") Tj
+T* () Tj
+T* (Salva un output:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py query "Crea una checklist di lavoro" --type checklist) Tj
+T* (--save) Tj
+T* () Tj
+T* (Esegui lint:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py lint) Tj
+T* () Tj
+T* (4. USO MULTI-WORKSPACE) Tj
+T* () Tj
+T* (Un workspace e una wiki separata. Usalo quando vuoi separare lavori, clienti o domini.) Tj
+T* () Tj
+T* (Crea un workspace:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py init --workspace instances/client-alpha) Tj
+T* () Tj
+T* (Aggiungi fonti in:) Tj
+T* () Tj
+T* (instances/client-alpha/raw/sources/) Tj
+T* () Tj
+T* (Ingerisci una fonte:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py ingest brief.md --workspace instances/client-alpha) Tj
+T* () Tj
+T* (Query sul workspace:) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 1316 >>
+stream
+BT
+/F1 10 Tf
+50 790 Td
+14 TL
+() Tj
+T* (python3 -B scripts/llm_wiki.py query "Quali sono le priorita del cliente?" --workspace) Tj
+T* (instances/client-alpha) Tj
+T* () Tj
+T* (Salva un output nel workspace:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py query "Crea una proposta operativa" --type proposta) Tj
+T* (--workspace instances/client-alpha --save) Tj
+T* () Tj
+T* (5. CONFIGURARE UN WORKSPACE) Tj
+T* () Tj
+T* (Ogni workspace puo avere un config.yaml:) Tj
+T* () Tj
+T* (name: client-alpha) Tj
+T* (language: it) Tj
+T* (provider: ollama) Tj
+T* (model: qwen2.5:3b) Tj
+T* () Tj
+T* (La precedenza e:) Tj
+T* () Tj
+T* (1. opzioni CLI;) Tj
+T* (2. .env;) Tj
+T* (3. workspace/config.yaml;) Tj
+T* (4. default interni.) Tj
+T* () Tj
+T* (Esempio override modello:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py query "Riassumi" --workspace instances/client-alpha) Tj
+T* (--model llama3.2) Tj
+T* () Tj
+T* (6. USARE OPENAI OPZIONALMENTE) Tj
+T* () Tj
+T* (Di default il progetto usa Ollama. Per OpenAI crea .env:) Tj
+T* () Tj
+T* (LLM_PROVIDER=openai) Tj
+T* (OPENAI_API_KEY=sk-...) Tj
+T* (OPENAI_MODEL=gpt-5.2) Tj
+T* () Tj
+T* (Poi usa normalmente la CLI:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py query "Riassumi la wiki") Tj
+T* () Tj
+T* (7. ESEMPI PER LAVORI DIVERSI) Tj
+T* () Tj
+T* (Consulente o freelance) Tj
+T* () Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 1415 >>
+stream
+BT
+/F1 10 Tf
+50 790 Td
+14 TL
+(Fonti utili:) Tj
+T* () Tj
+T* (- brief cliente;) Tj
+T* (- note call;) Tj
+T* (- preventivi;) Tj
+T* (- obiettivi;) Tj
+T* (- vincoli;) Tj
+T* (- feedback.) Tj
+T* () Tj
+T* (Comandi:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py init --workspace instances/cliente-rossi) Tj
+T* (python3 -B scripts/llm_wiki.py ingest brief.md --workspace instances/cliente-rossi) Tj
+T* (python3 -B scripts/llm_wiki.py query "Crea una proposta di lavoro" --type proposta) Tj
+T* (--workspace instances/cliente-rossi --save) Tj
+T* () Tj
+T* (Output utili:) Tj
+T* () Tj
+T* (- proposta commerciale;) Tj
+T* (- piano operativo;) Tj
+T* (- checklist onboarding;) Tj
+T* (- FAQ cliente;) Tj
+T* (- rischi e domande aperte.) Tj
+T* () Tj
+T* (Agenzia marketing) Tj
+T* () Tj
+T* (Fonti utili:) Tj
+T* () Tj
+T* (- audit sito;) Tj
+T* (- buyer personas;) Tj
+T* (- campagne precedenti;) Tj
+T* (- report analytics;) Tj
+T* (- messaggi approvati;) Tj
+T* (- competitor.) Tj
+T* () Tj
+T* (Comandi:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py init --workspace instances/campagna-q3) Tj
+T* (python3 -B scripts/llm_wiki.py ingest audit-sito.md --workspace instances/campagna-q3) Tj
+T* (python3 -B scripts/llm_wiki.py query "Crea un piano contenuti di 30 giorni" --type) Tj
+T* (piano-editoriale --workspace instances/campagna-q3 --save) Tj
+T* () Tj
+T* (Output utili:) Tj
+T* () Tj
+T* (- piano editoriale;) Tj
+T* (- angoli creativi;) Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 1359 >>
+stream
+BT
+/F1 10 Tf
+50 790 Td
+14 TL
+(- checklist landing page;) Tj
+T* (- script ads;) Tj
+T* (- report criticita.) Tj
+T* () Tj
+T* (Studio professionale) Tj
+T* () Tj
+T* (Fonti utili:) Tj
+T* () Tj
+T* (- procedure interne;) Tj
+T* (- FAQ clienti;) Tj
+T* (- normative riassunte manualmente;) Tj
+T* (- checklist documentale;) Tj
+T* (- casi ricorrenti.) Tj
+T* () Tj
+T* (Comandi:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py init --workspace instances/studio-procedure) Tj
+T* (python3 -B scripts/llm_wiki.py ingest procedura-onboarding.md --workspace) Tj
+T* (instances/studio-procedure) Tj
+T* (python3 -B scripts/llm_wiki.py query "Crea una checklist per il cliente" --type) Tj
+T* (checklist --workspace instances/studio-procedure --save) Tj
+T* () Tj
+T* (Output utili:) Tj
+T* () Tj
+T* (- checklist operative;) Tj
+T* (- email template;) Tj
+T* (- FAQ;) Tj
+T* (- SOP interne;) Tj
+T* (- domande mancanti per il cliente.) Tj
+T* () Tj
+T* (Team software) Tj
+T* () Tj
+T* (Fonti utili:) Tj
+T* () Tj
+T* (- README tecnici;) Tj
+T* (- decision record;) Tj
+T* (- issue importanti;) Tj
+T* (- note architetturali;) Tj
+T* (- runbook;) Tj
+T* (- postmortem.) Tj
+T* () Tj
+T* (Comandi:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py init --workspace instances/software-docs) Tj
+T* (python3 -B scripts/llm_wiki.py ingest architecture-notes.md --workspace) Tj
+T* (instances/software-docs) Tj
+ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 1324 >>
+stream
+BT
+/F1 10 Tf
+50 790 Td
+14 TL
+(python3 -B scripts/llm_wiki.py query "Crea un runbook operativo" --type runbook) Tj
+T* (--workspace instances/software-docs --save) Tj
+T* () Tj
+T* (Output utili:) Tj
+T* () Tj
+T* (- runbook;) Tj
+T* (- ADR sintetici;) Tj
+T* (- checklist deploy;) Tj
+T* (- troubleshooting;) Tj
+T* (- onboarding developer.) Tj
+T* () Tj
+T* (Ricerca personale o studio) Tj
+T* () Tj
+T* (Fonti utili:) Tj
+T* () Tj
+T* (- appunti di lettura;) Tj
+T* (- paper riassunti;) Tj
+T* (- lezioni;) Tj
+T* (- domande aperte;) Tj
+T* (- mappe concettuali.) Tj
+T* () Tj
+T* (Comandi:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py init --workspace instances/personal-knowledge) Tj
+T* (python3 -B scripts/llm_wiki.py ingest appunti-libro.md --workspace instances/personal-) Tj
+T* (knowledge) Tj
+T* (python3 -B scripts/llm_wiki.py query "Crea una scheda di ripasso" --type scheda-studio) Tj
+T* (--workspace instances/personal-knowledge --save) Tj
+T* () Tj
+T* (Output utili:) Tj
+T* () Tj
+T* (- schede studio;) Tj
+T* (- domande di ripasso;) Tj
+T* (- sintesi;) Tj
+T* (- glossario;) Tj
+T* (- collegamenti tra concetti.) Tj
+T* () Tj
+T* (HR e formazione) Tj
+T* () Tj
+T* (Fonti utili:) Tj
+T* () Tj
+T* (- job description;) Tj
+T* (- processi onboarding;) Tj
+T* (- policy interne;) Tj
+T* (- materiali formativi;) Tj
+T* (- feedback colloqui.) Tj
+ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 1149 >>
+stream
+BT
+/F1 10 Tf
+50 790 Td
+14 TL
+() Tj
+T* (Comandi:) Tj
+T* () Tj
+T* (python3 -B scripts/llm_wiki.py init --workspace instances/hr-training) Tj
+T* (python3 -B scripts/llm_wiki.py ingest onboarding.md --workspace instances/hr-training) Tj
+T* (python3 -B scripts/llm_wiki.py query "Crea un percorso onboarding" --type piano-) Tj
+T* (formazione --workspace instances/hr-training --save) Tj
+T* () Tj
+T* (Output utili:) Tj
+T* () Tj
+T* (- piano onboarding;) Tj
+T* (- checklist manager;) Tj
+T* (- FAQ nuovo assunto;) Tj
+T* (- template colloquio;) Tj
+T* (- matrice competenze.) Tj
+T* () Tj
+T* (8. COME SCRIVERE BUONE FONTI) Tj
+T* () Tj
+T* (Una buona fonte contiene:) Tj
+T* () Tj
+T* (- contesto;) Tj
+T* (- obiettivo;) Tj
+T* (- vincoli;) Tj
+T* (- dati verificabili;) Tj
+T* (- esempi;) Tj
+T* (- output desiderati;) Tj
+T* (- domande aperte.) Tj
+T* () Tj
+T* (Template fonte:) Tj
+T* () Tj
+T* (# Titolo fonte) Tj
+T* () Tj
+T* (## Contesto) Tj
+T* () Tj
+T* (## Obiettivo) Tj
+T* () Tj
+T* (## Vincoli) Tj
+T* () Tj
+T* (## Informazioni disponibili) Tj
+T* () Tj
+T* (## Esempi o casi reali) Tj
+T* () Tj
+T* (## Output desiderati) Tj
+T* () Tj
+T* (## Domande aperte) Tj
+T* () Tj
+ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 1166 >>
+stream
+BT
+/F1 10 Tf
+50 790 Td
+14 TL
+(9. ROUTINE CONSIGLIATA) Tj
+T* () Tj
+T* (1. Crea o scegli un workspace.) Tj
+T* (2. Aggiungi fonti in raw/sources/.) Tj
+T* (3. Esegui ingest.) Tj
+T* (4. Leggi e correggi gli output importanti.) Tj
+T* (5. Usa query --save per produrre asset riutilizzabili.) Tj
+T* (6. Esegui lint.) Tj
+T* (7. Sposta manualmente le pagine mature in entities/ o concepts/.) Tj
+T* () Tj
+T* (10. COSA NON FARE) Tj
+T* () Tj
+T* (- Non inserire chiavi API in git.) Tj
+T* (- Non usare fonti private in repo pubbliche.) Tj
+T* (- Non fidarti ciecamente degli output del modello.) Tj
+T* (- Non usare la wiki come unica fonte di verita legale, medica o finanziaria.) Tj
+T* (- Non mischiare clienti o domini nello stesso workspace se devono restare separati.) Tj
+T* () Tj
+T* (11. CHECKLIST DI AVVIO) Tj
+T* () Tj
+T* ([ ] Ho installato Python 3.11+) Tj
+T* ([ ] Ho installato le dipendenze) Tj
+T* ([ ] Ho installato Ollama o configurato OpenAI) Tj
+T* ([ ] Ho creato un workspace) Tj
+T* ([ ] Ho aggiunto almeno una fonte in raw/sources/) Tj
+T* ([ ] Ho eseguito ingest) Tj
+T* ([ ] Ho fatto una query) Tj
+T* ([ ] Ho salvato un output utile) Tj
+T* ([ ] Ho eseguito lint) Tj
+ET
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 18 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R >> >> /Contents 16 0 R >>
+endobj
+18 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R] /Count 8 >>
+endobj
+19 0 obj
+<< /Type /Catalog /Pages 18 0 R >>
+endobj
+xref
+0 20
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000001605 00000 n 
+0000001732 00000 n 
+0000003110 00000 n 
+0000003237 00000 n 
+0000004605 00000 n 
+0000004732 00000 n 
+0000006199 00000 n 
+0000006326 00000 n 
+0000007738 00000 n 
+0000007867 00000 n 
+0000009244 00000 n 
+0000009373 00000 n 
+0000010575 00000 n 
+0000010704 00000 n 
+0000011923 00000 n 
+0000012052 00000 n 
+0000012156 00000 n 
+trailer
+<< /Size 20 /Root 19 0 R >>
+startxref
+12207
+%%EOF

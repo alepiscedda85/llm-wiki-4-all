@@ -302,6 +302,7 @@ status: draft
 Quando modifichi architettura, workspace o roadmap, aggiorna anche:
 
 - `README.md` per l'uso pratico;
+- `docs/USER_GUIDE.md` e il PDF collegato per la guida utente pratica;
 - `docs/ARCHITECTURE.md` per componenti e flusso tecnico;
 - `docs/MULTI_WORKSPACE.md` per comportamento multi-wiki;
 - `docs/ROADMAP.md` per priorita e limiti.

@@ -12,6 +12,8 @@ Non usa database, vector database, LangChain o frontend.
 
 ## Documentazione
 
+- [Guida pratica](docs/USER_GUIDE.md): come usare il progetto con esempi per lavori diversi.
+- [Guida pratica PDF](docs/llm-wiki-4-all-user-guide.pdf): versione PDF della guida utente.
 - [Architettura](docs/ARCHITECTURE.md): componenti, flusso dati, provider e limiti architetturali.
 - [Multi-workspace](docs/MULTI_WORKSPACE.md): uso di piu wiki separate nella stessa repo.
 - [Roadmap](docs/ROADMAP.md): priorita tecniche e confini dell'MVP.
