@@ -279,6 +279,28 @@ LLM_PROVIDER=auto
 
 Con `auto`, la CLI usa OpenAI se trova `OPENAI_API_KEY`; altrimenti resta su Ollama.
 
+## Workspace config.yaml
+
+Ogni workspace puo avere un file `config.yaml` minimale:
+
+```yaml
+name: workspace
+language: it
+provider: ollama
+model: qwen2.5:3b
+```
+
+La CLI lo legge senza dipendenze YAML esterne. Per ora supporta chiavi flat `key: value`.
+
+Precedenza configurazione:
+
+1. opzioni CLI, per esempio `--provider` e `--model`;
+2. variabili `.env`, per esempio `LLM_PROVIDER`, `OLLAMA_MODEL`, `OPENAI_MODEL`;
+3. `workspace/config.yaml`;
+4. default interni.
+
+`language` viene usato nei prompt per chiedere al modello di rispondere nella lingua del workspace.
+
 ## Provider e modelli
 
 Default:
@@ -502,6 +524,22 @@ Conviene evitare di committare:
 - fonti private;
 - output generati da test locali;
 - materiale cliente o dati sensibili.
+
+## Test automatici
+
+La repo include test `unittest` senza dipendenze extra:
+
+```bash
+python3 -B -m unittest discover -s tests
+```
+
+I test coprono:
+
+- path e risoluzione fonti del workspace;
+- parsing minimale di `config.yaml`;
+- creazione file/cartelle con `init`;
+- precedenza CLI/env/config/default per provider e modello;
+- prompt di ingest con source path relativo al workspace.
 
 ## Troubleshooting
 

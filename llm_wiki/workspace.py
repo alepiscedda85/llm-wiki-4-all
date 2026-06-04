@@ -89,7 +89,9 @@ class Workspace:
 
     def display_path(self, path: Path) -> str:
         """Return a readable path, relative to the workspace when possible."""
+        resolved_root = self.root.resolve()
+        resolved_path = path.resolve()
         try:
-            return path.relative_to(self.root).as_posix()
+            return resolved_path.relative_to(resolved_root).as_posix()
         except ValueError:
-            return path.as_posix()
+            return resolved_path.as_posix()

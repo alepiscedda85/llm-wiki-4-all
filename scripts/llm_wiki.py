@@ -15,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from llm_wiki.config import parse_simple_yaml
 from llm_wiki.workspace import Workspace
 
 try:
@@ -242,9 +243,28 @@ def ollama_host(workspace: Workspace | None = None) -> str:
     return os.getenv("OLLAMA_HOST", DEFAULT_OLLAMA_HOST).rstrip("/")
 
 
+def workspace_config(workspace: Workspace | None = None) -> dict[str, str]:
+    if not workspace:
+        return {}
+    return parse_simple_yaml(workspace.config_file)
+
+
+def config_value(workspace: Workspace | None, key: str, default: str = "") -> str:
+    return workspace_config(workspace).get(key, default).strip()
+
+
+def workspace_language(workspace: Workspace | None = None) -> str:
+    return config_value(workspace, "language", "it") or "it"
+
+
 def selected_provider(args: argparse.Namespace, workspace: Workspace | None = None) -> str:
     load_environment(workspace)
-    provider = args.provider or args.global_provider or os.getenv("LLM_PROVIDER", DEFAULT_PROVIDER)
+    provider = (
+        args.provider
+        or args.global_provider
+        or os.getenv("LLM_PROVIDER")
+        or config_value(workspace, "provider", DEFAULT_PROVIDER)
+    )
     if provider != "auto":
         return provider
     # `auto` e comodo nei fork: chi inserisce OPENAI_API_KEY usa OpenAI,
@@ -258,9 +278,15 @@ def selected_model(args: argparse.Namespace, workspace: Workspace | None = None)
     if args.global_model:
         return args.global_model
     provider = selected_provider(args, workspace)
+    env_model = os.getenv("OPENAI_MODEL") if provider == "openai" else os.getenv("OLLAMA_MODEL")
+    if env_model:
+        return env_model
+    configured_model = config_value(workspace, "model")
+    if configured_model:
+        return configured_model
     if provider == "openai":
-        return os.getenv("OPENAI_MODEL", DEFAULT_OPENAI_MODEL)
-    return os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
+        return DEFAULT_OPENAI_MODEL
+    return DEFAULT_OLLAMA_MODEL
 
 
 def call_llm(
@@ -375,13 +401,14 @@ def read_agents(workspace: Workspace) -> str:
     return fallback
 
 
-def source_prompt(source_path: Path, source_text: str, index_text: str) -> str:
+def source_prompt(source_ref: str, source_text: str, index_text: str, language: str) -> str:
     """Costruisce il contratto di output per trasformare una fonte in pagina wiki."""
     truncated = source_text[:MAX_SOURCE_CHARS]
     return f"""Trasforma questa fonte grezza in una pagina wiki Markdown operativa.
 
 Regole:
 - Restituisci solo Markdown.
+- Rispondi solo in lingua: {language}.
 - Non inventare informazioni.
 - Se una sezione non ha dati sufficienti, scrivi "Non disponibile nella fonte."
 - Usa wikilink Obsidian-style nella sezione Collegamenti quando utile.
@@ -394,7 +421,7 @@ Frontmatter da compilare:
 ---
 title:
 type: output
-source: {source_path.as_posix()}
+source: {source_ref}
 created: {today_iso()}
 updated: {today_iso()}
 tags: []
@@ -476,14 +503,14 @@ def command_ingest(args: argparse.Namespace) -> None:
         raise SystemExit("La fonte e vuota.")
 
     fallback_title = source_path.stem.replace("-", " ").replace("_", " ").title()
+    source_ref = workspace.display_path(source_path)
     index_text = read_text(workspace.index_file)
     generated = call_llm(
-        source_prompt(source_path, source_text, index_text),
+        source_prompt(source_ref, source_text, index_text, workspace_language(workspace)),
         args,
         read_agents(workspace),
         workspace,
     )
-    source_ref = workspace.display_path(source_path)
     page, title = normalize_generated_page(generated, source_ref, fallback_title)
     target = unique_path(workspace.outputs_dir / f"{slugify(title)}.md")
     target.write_text(page, encoding="utf-8")
@@ -558,6 +585,7 @@ def query_prompt(
     context_files: list[str],
     index_text: str,
     output_type: str,
+    language: str,
 ) -> str:
     """Costruisce il prompt di risposta usando solo il contesto locale selezionato."""
     return f"""Rispondi alla domanda usando solo il contesto della wiki locale.
@@ -565,6 +593,7 @@ def query_prompt(
 Regole:
 - Se il contesto non basta, dillo chiaramente.
 - Produci una risposta operativa e riutilizzabile.
+- Rispondi solo in lingua: {language}.
 - Se e richiesto un tipo output, rispetta il tipo indicato.
 - Evidenzia assunzioni, rischi e prossime azioni.
 - Cita esplicitamente i file wiki usati nella sezione "File wiki usati".
@@ -596,7 +625,7 @@ def command_query(args: argparse.Namespace) -> None:
     context, context_files = relevant_context(workspace, args.question)
     index_text = read_text(workspace.index_file)
     answer = call_llm(
-        query_prompt(args.question, context, context_files, index_text, output_type),
+        query_prompt(args.question, context, context_files, index_text, output_type, workspace_language(workspace)),
         args,
         read_agents(workspace),
         workspace,
@@ -625,7 +654,7 @@ def command_query(args: argparse.Namespace) -> None:
         print(f"\nRisposta salvata: {workspace.display_path(target)}")
 
 
-def lint_prompt(context: str) -> str:
+def lint_prompt(context: str, language: str) -> str:
     """Chiede al modello un audit operativo della wiki corrente."""
     return f"""Analizza questa wiki Markdown come manutentore operativo.
 
@@ -646,6 +675,7 @@ Produci un report in Markdown con sezioni:
 
 Regole:
 - Non inventare evidenze.
+- Rispondi solo in lingua: {language}.
 - Cita i file quando individui un problema.
 - Valuta sempre problema, utilita pratica, riuso e affidabilita.
 
@@ -673,7 +703,7 @@ def command_lint(args: argparse.Namespace) -> None:
     workspace = resolve_workspace(args)
     ensure_initialized(workspace)
     report = call_llm(
-        lint_prompt(full_wiki_context(workspace)),
+        lint_prompt(full_wiki_context(workspace), workspace_language(workspace)),
         args,
         read_agents(workspace),
         workspace,
