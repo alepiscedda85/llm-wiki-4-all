@@ -10,6 +10,12 @@ Di default usa modelli gratuiti/locali tramite Ollama. Se vuoi, puoi usare anche
 
 Non usa database, vector database, LangChain o frontend.
 
+## Documentazione
+
+- [Architettura](docs/ARCHITECTURE.md): componenti, flusso dati, provider e limiti architetturali.
+- [Multi-workspace](docs/MULTI_WORKSPACE.md): uso di piu wiki separate nella stessa repo.
+- [Roadmap](docs/ROADMAP.md): priorita tecniche e confini dell'MVP.
+
 ## A cosa serve
 
 Serve a trasformare materiale sparso in conoscenza operativa persistente.
@@ -181,6 +187,7 @@ Ogni istanza ha `AGENTS.md`, `config.yaml`, `raw/` e `wiki/` separati. Il motore
 AGENTS.md             istruzioni fallback per agenti e modelli
 README.md             guida pratica del progetto
 requirements.txt      dipendenze Python
+docs/                documentazione tecnica del progetto
 llm_wiki/             package core, inclusa la logica Workspace
 scripts/llm_wiki.py   CLI principale
 instances/            workspace opzionali, uno per wiki
@@ -614,11 +621,12 @@ Migliora la fonte. Aggiungi:
 
 ## Prossimi step possibili
 
-- Prompt piu rigidi per lingua e formato.
-- Test automatici CLI.
-- Profili di progetto separati.
-- Template pagina personalizzabili.
-- Export PDF.
-- Frontend guidato.
-- RAG ibrido con embedding locali.
-- Supporto multi-wiki o multi-dominio.
+La roadmap completa e in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+Priorita brevi:
+
+- separare `scripts/llm_wiki.py` in moduli piu piccoli;
+- aggiungere comandi `workspace list/create/doctor`;
+- ampliare i test CLI e i mock provider;
+- validare meglio le pagine Markdown generate;
+- aggiungere export solo dopo aver stabilizzato la CLI.

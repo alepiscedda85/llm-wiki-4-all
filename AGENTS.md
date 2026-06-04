@@ -84,6 +84,7 @@ Il file `.env.example` puo documentare variabili, ma non deve contenere segreti.
 - Senza `--workspace`, la directory corrente e il workspace.
 - Con `--workspace`, leggere e scrivere solo dentro il workspace indicato.
 - Ogni workspace puo avere il proprio `AGENTS.md` e `config.yaml`.
+- `config.yaml` contribuisce a provider, modello e lingua del workspace.
 - Non mischiare fonti, output, indice o log tra workspace diversi.
 - `raw/`, `wiki/`, `index.md`, `log.md` e `outputs/` sono sempre relativi al workspace selezionato.
 - Le istruzioni agente vanno lette in ordine: `workspace/AGENTS.md`, `AGENTS.md` della root progetto, fallback interno minimale.
@@ -294,6 +295,18 @@ status: draft
 5. Usare `query --save` per creare output riutilizzabili.
 6. Eseguire `lint` per trovare buchi, rischi e opportunita.
 7. Aggiornare manualmente pagine importanti quando serve.
+
+
+## Documentazione progetto
+
+Quando modifichi architettura, workspace o roadmap, aggiorna anche:
+
+- `README.md` per l'uso pratico;
+- `docs/ARCHITECTURE.md` per componenti e flusso tecnico;
+- `docs/MULTI_WORKSPACE.md` per comportamento multi-wiki;
+- `docs/ROADMAP.md` per priorita e limiti.
+
+La documentazione deve restare generica e domain-agnostic.
 
 ## Stile codice
 
